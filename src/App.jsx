@@ -1,12 +1,20 @@
-import Header from "./components/Header";
-import DashboardGrid from "./components/DashboardGrid";
+
+// src/App.js
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import HomePage from './components/HomePage';
+import TwitterTrendsPage from './components/TwitterTrendsPage';
+import RedditTrendsPage from './components/RedditTrendsPage';
 
 function App() {
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <Header />
-      <DashboardGrid />
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/twitter" element={<TwitterTrendsPage />} />
+        <Route path="/reddit" element={<RedditTrendsPage />} />
+      </Routes>
+    </Router>
   );
 }
 
