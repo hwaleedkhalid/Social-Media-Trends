@@ -7,6 +7,9 @@ from twitter_client import TwitterClient
 import asyncio
 import json
 from typing import Dict, List
+from fastapi.responses import StreamingResponse
+import io
+import csv
 import uuid
 
 # FastAPI app initialization
@@ -77,12 +80,21 @@ manager = ConnectionManager()
 
 # Pydantic models for request/response validation
 class StreamingRequest(BaseModel):
-    keyword: str
+    keywords: List[str]  # Change from single keyword to list
+    use_real_api: bool = False
 
 class StreamingResponse(BaseModel):
     status: str
     keyword: str
     message: str
+
+class MultiKeywordDashboardData(BaseModel):
+    total_tweets: int
+    sentiment_distribution: Dict[str, int]
+    hashtag_counts: Dict[str, int]
+    tweet_volume: List[Dict]
+    recent_tweets: List[Dict]
+    keyword_breakdown: Dict[str, Dict]  # Add keyword-level metrics
 
 class DashboardDataResponse(BaseModel):
     total_tweets: int
@@ -110,7 +122,7 @@ async def root():
 async def health_check():
     return {"status": "OK", "message": "Backend is running"}
 
-@app.post("/api/start-streaming", response_model=StreamingResponse)
+""" @app.post("/api/start-streaming", response_model=StreamingResponse)
 async def start_streaming(request: StreamingRequest):
     if dashboard_state.is_streaming:
         raise HTTPException(status_code=400, detail="Already streaming")
@@ -135,7 +147,28 @@ async def start_streaming(request: StreamingRequest):
         status="started",
         keyword=request.keyword,
         message=f"Started streaming tweets for: {request.keyword}"
+    ) """
+@app.post("/api/start-streaming", response_model=StreamingResponse)
+async def start_streaming(request: StreamingRequest):
+    if dashboard_state.is_streaming:
+        raise HTTPException(status_code=400, detail="Already streaming")
+    
+    dashboard_state.is_streaming = True
+    dashboard_state.current_keyword = ", ".join(request.keywords)  # Join for display
+    
+    # Reset data processor
+    data_processor.reset()
+    
+    # Start streaming - pass first keyword for now (we'll enhance this later)
+    primary_keyword = request.keywords[0] if request.keywords else "technology"
+    twitter_client.start_streaming(primary_keyword, data_processor, manager)
+    
+    return StreamingResponse(
+        status="started",
+        keyword=", ".join(request.keywords),
+        message=f"Started streaming tweets for: {', '.join(request.keywords)}"
     )
+
 
 @app.post("/api/stop-streaming")
 async def stop_streaming():
@@ -154,6 +187,42 @@ async def get_streaming_status():
         "current_keyword": dashboard_state.current_keyword,
         "total_tweets": dashboard_state.data['total_tweets']
     }
+
+@app.get("/api/export/csv")
+async def export_csv():
+    """Export dashboard data as CSV"""
+    data = dashboard_state.data
+    
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write headers
+    writer.writerow(['Metric', 'Value'])
+    writer.writerow(['Total Tweets', data['total_tweets']])
+    writer.writerow(['Positive Sentiment', data['sentiment_distribution']['positive']])
+    writer.writerow(['Neutral Sentiment', data['sentiment_distribution']['neutral']])
+    writer.writerow(['Negative Sentiment', data['sentiment_distribution']['negative']])
+    
+    # Write hashtags
+    writer.writerow([])
+    writer.writerow(['Hashtag', 'Count'])
+    for hashtag, count in data['hashtag_counts'].items():
+        writer.writerow([hashtag, count])
+    
+    # Prepare response
+    output.seek(0)
+    
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=dashboard_export.csv"}
+    )
+
+@app.get("/api/export/json")
+async def export_json():
+    """Export dashboard data as JSON"""
+    return dashboard_state.data
 
 # WebSocket endpoint
 @app.websocket("/ws/{client_id}")

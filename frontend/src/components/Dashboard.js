@@ -6,7 +6,11 @@ import RecentTweets from './RecentTweets';
 import SentimentChart from './Charts/SentimentChart';
 import HashtagsChart from './Charts/HashtagsChart';
 import VolumeChart from './Charts/VolumeChart';
+import AdvancedMetrics from './AdvancedMetrics';
 import '../styles/Dashboard.css';
+
+// Define API base URL constant
+const API_BASE_URL = 'http://localhost:8000';
 
 const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState({
@@ -14,7 +18,12 @@ const Dashboard = () => {
     sentiment_distribution: { positive: 0, negative: 0, neutral: 0 },
     hashtag_counts: {},
     tweet_volume: [],
-    recent_tweets: []
+    recent_tweets: [],
+    engagement_metrics: {
+      total_retweets: 0,
+      total_likes: 0,
+      avg_engagement: 0
+    }
   });
   const [isConnected, setIsConnected] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -47,19 +56,29 @@ const Dashboard = () => {
     };
   }, []);
 
-  const handleStartStreaming = async (keyword) => {
+  const handleStartStreaming = async (keywords, useRealAPI = false) => {
     if (!isConnected) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/start-streaming/${encodeURIComponent(keyword)}`);
+      const response = await fetch(`${API_BASE_URL}/api/start-streaming`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          keywords: Array.isArray(keywords) ? keywords : [keywords],
+          use_real_api: useRealAPI 
+        }),
+      });
+      
       const result = await response.json();
       
       if (response.ok) {
         setIsStreaming(true);
-        setCurrentKeyword(keyword);
+        setCurrentKeyword(Array.isArray(keywords) ? keywords.join(', ') : keywords);
         console.log('Streaming started:', result);
       } else {
-        console.error('Failed to start streaming:', result.error);
+        console.error('Failed to start streaming:', result.detail);
       }
     } catch (error) {
       console.error('Error starting streaming:', error);
@@ -68,7 +87,10 @@ const Dashboard = () => {
 
   const handleStopStreaming = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/stop-streaming');
+      const response = await fetch(`${API_BASE_URL}/api/stop-streaming`, {
+        method: 'POST',
+      });
+      
       const result = await response.json();
       
       if (response.ok) {
@@ -107,6 +129,9 @@ const Dashboard = () => {
 
       {/* Metrics Cards */}
       <MetricsCards data={dashboardData} />
+
+      {/* Advanced Metrics */}
+      <AdvancedMetrics data={dashboardData} />
 
       {/* Charts Row 1 */}
       <div className="row mt-4">
@@ -164,7 +189,7 @@ const Dashboard = () => {
       <footer className="row mt-5 mb-3">
         <div className="col text-center text-muted">
           <small>
-            Real-time Social Media Dashboard • Built with React & Flask • 
+            Real-time Social Media Dashboard • Built with React & FastAPI • 
             Total Tweets Processed: <strong>{dashboardData.total_tweets}</strong>
           </small>
         </div>

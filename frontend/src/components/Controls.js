@@ -7,11 +7,19 @@ const Controls = ({
   onStartStreaming, 
   onStopStreaming 
 }) => {
-  const [keyword, setKeyword] = useState('technology');
+  const [keyword, setKeyword] = useState('technology, AI, programming');
+  const [useRealAPI, setUseRealAPI] = useState(false);
 
   const handleStartStreaming = () => {
     if (keyword.trim()) {
-      onStartStreaming(keyword.trim());
+      // Split by commas and clean up
+      const keywords = keyword.split(',')
+        .map(k => k.trim())
+        .filter(k => k.length > 0);
+      
+      if (keywords.length > 0) {
+        onStartStreaming(keywords, useRealAPI);
+      }
     }
   };
 
@@ -24,18 +32,35 @@ const Controls = ({
     <div className="row bg-light p-3 rounded mb-3">
       <div className="col-md-8">
         <form onSubmit={handleSubmit}>
-          <div className="input-group">
+          <div className="input-group mb-2">
             <span className="input-group-text bg-primary text-white">
               <i className="fas fa-hashtag"></i>
             </span>
             <input
               type="text"
               className="form-control form-control-lg"
-              placeholder="Enter keyword or hashtag (e.g., AI, Python, JavaScript)..."
+              placeholder="Enter keywords separated by commas (e.g., AI, Python, JavaScript)..."
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               disabled={isStreaming}
             />
+          </div>
+          
+          <div className="form-check mb-2">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id="useRealAPI"
+              checked={useRealAPI}
+              onChange={(e) => setUseRealAPI(e.target.checked)}
+              disabled={isStreaming}
+            />
+            <label className="form-check-label" htmlFor="useRealAPI">
+              Use Real Twitter API (requires API keys)
+            </label>
+          </div>
+
+          <div className="d-flex gap-2">
             {!isStreaming ? (
               <button 
                 className="btn btn-primary btn-lg" 
@@ -55,6 +80,16 @@ const Controls = ({
                 Stop Streaming
               </button>
             )}
+            
+            <button 
+              className="btn btn-outline-secondary btn-lg"
+              type="button"
+              onClick={() => window.open('http://localhost:8000/api/export/csv', '_blank')}
+              disabled={!isStreaming}
+            >
+              <i className="fas fa-download me-2"></i>
+              Export CSV
+            </button>
           </div>
         </form>
       </div>
