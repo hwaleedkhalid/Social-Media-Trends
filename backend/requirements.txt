@@ -4,6 +4,5 @@ websockets
 pandas
 requests
 textblob
-python-dotenv
 pydantic
 tweepy
