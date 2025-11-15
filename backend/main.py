@@ -10,6 +10,7 @@ from typing import Dict, List
 from fastapi.responses import StreamingResponse
 import io
 import csv
+from hdfs import InsecureClient
 import uuid
 
 # FastAPI app initialization
@@ -190,7 +191,11 @@ async def get_streaming_status():
 
 @app.get("/api/export/csv")
 async def export_csv():
-    """Export dashboard data as CSV"""
+    """Export dashboard data as CSV and auto-upload to HDFS"""
+
+    # Initialize HDFS client
+    hdfs_client = InsecureClient("http://localhost:9870", user="hdfs")
+
     data = dashboard_state.data
     
     # Create CSV in memory
@@ -210,14 +215,30 @@ async def export_csv():
     for hashtag, count in data['hashtag_counts'].items():
         writer.writerow([hashtag, count])
     
-    # Prepare response
+    # Convert to string and reset buffer
+    csv_string = output.getvalue()
     output.seek(0)
+
+
+    #  AUTO-UPLOAD TO HDFS
+    file_name = f"dashboard_export_{uuid.uuid4().hex}.csv"
+    hdfs_path = f"/user/hdfs/trends/{file_name}"
+
+    try:
+        hdfs_client.write(hdfs_path, data=csv_string.encode(), overwrite=True)
+        print(f"[✓] CSV auto-uploaded to HDFS at: {hdfs_path}")
+    except Exception as e:
+        print(f"[ERROR] Failed to upload CSV to HDFS: {e}")
+
+    #  RETURN CSV TO USER
     
     return StreamingResponse(
-        io.BytesIO(output.getvalue().encode()),
+        io.BytesIO(csv_string.encode()),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=dashboard_export.csv"}
+        headers={"Content-Disposition": f"attachment; filename={file_name}"}
     )
+
+
 
 @app.get("/api/export/json")
 async def export_json():
