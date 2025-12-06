@@ -1,9 +1,16 @@
+# Core Dependencies
 fastapi
-uvicorn
+uvicorn[standard]
 websockets
 pandas
 requests
-textblob
-pydantic
 tweepy
+textblob
+nltk
+pydantic
 hdfs
+python-dotenv
+
+# Development (optional)
+pytest
+httpx
