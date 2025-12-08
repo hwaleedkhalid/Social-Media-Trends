@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Hadoop HDFS
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    restart: always
+    ports:
+      - 9870:9870  # Web UI
+      - 9000:9000  # HDFS Service
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=twitter_cluster
+    env_file:
+      - ./hadoop-hive.env
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    restart: always
+    depends_on:
+      - namenode
+    volumes:
+      - datanode_data:/hadoop/dfs/data
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+    env_file:
+      - ./hadoop-hive.env
+
+  # FastAPI Backend
+  fastapi:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - namenode
+    volumes:
+      - ./uploaded_csvs:/app/uploaded_csvs
+      - ./backend:/app
+    environment:
+      - HDFS_HOST=namenode
+      - HDFS_WEB_PORT=9870
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # React Frontend
+  react:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - fastapi
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+
+volumes:
+  namenode_data:
+  datanode_data:
